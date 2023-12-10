@@ -32,7 +32,11 @@ int stirSpeed_set;
 
 void setup() {
   Wire.begin(NUCLEO_ADDR); // join i2c bus with address #64 (0x40)
-  pinMode(3, OUTPUT);
+  pinMode(3, OUTPUT); // pin for the thermistor
+  pinMode(pumpA, OUTPUT); // pins for acid pump
+  pinMode(pumpB, OUTPUT); // pins for alkali pump
+  digitalWrite(pumpA, LOW);
+  digitalWrite(pumpB, LOW); // make sure pumps are off to begin with
   Wire.onReceive(receiveEvent); // receive set data from ThingsBoard
   Wire.onRequest(requestEvent); // send subsystem data to ESP32
   Serial.begin(9600);
