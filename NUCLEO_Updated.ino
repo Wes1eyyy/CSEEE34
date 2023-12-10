@@ -1,20 +1,22 @@
 // NUCLEO-64 code (send readings to esp32 and receive set values) - updated (4/12/2023)
 
-#define NUCLEO_ADDR 9
+#define NUCLEO_ADDR 0x40
 #include <Wire.h>
 
 // code for pH subsystem
 #define SensorPin A1            //pH meter Analog output to Arduino Analog Input 0
-#define Offset -3.42           //deviation compensate
+#define Offset -3.34          //deviation compensate
 #define LED 13
 #define samplingInterval 20
 #define printInterval 500
 #define ArrayLenth  40    //times of collection
 int pHArray[ArrayLenth];   //Store the average value of the sensor feedback
 int pHArrayIndex=0;
+#define pumpA 9 // acid pump
+#define pumpB 8 // alkaline pump
 
 // heating subsystem - declare variables
-int ThermistorPin = 2;
+#define ThermistorPin A2
 int Vo;
 float R1 = 10000;
 float logR2, R2, T;
@@ -22,14 +24,14 @@ float c1 = 1.009249522e-03, c2 = 2.378405444e-04, c3 = 2.019202697e-07;
 
 // declare variables
 float pH_reading = 5.3;
-float pH_set;
-float temp_reading = 35.1;
+float pH_set = 5.1;
+float temp_reading = 33.2;
 float temp_set = 32.0;
-int stirSpeed_reading = 1231;
+int stirSpeed_reading = 875;
 int stirSpeed_set;
 
 void setup() {
-  Wire.begin(NUCLEO_ADDR); // join i2c bus with address #8
+  Wire.begin(NUCLEO_ADDR); // join i2c bus with address #64 (0x40)
   pinMode(3, OUTPUT);
   Wire.onReceive(receiveEvent); // receive set data from ThingsBoard
   Wire.onRequest(requestEvent); // send subsystem data to ESP32
@@ -140,6 +142,24 @@ void loop() {
       voltage = avergearray(pHArray, ArrayLenth)*5.0/1024;
       pHValue = 3.5*voltage+Offset;
       samplingTime=millis();
+
+      if (pHValue < (pH_set-0.3)){
+        Serial.println("pH too low. Adding alkali");
+        digitalWrite(pumpB, HIGH);
+        digitalWrite(pumpA, LOW);
+        delay(1000);
+      }
+      else if(pHValue > (pH_set + 0.3)){
+        Serial.println("pH too high. Adding acid");
+        digitalWrite(pumpA, HIGH);
+        digitalWrite(pumpB, LOW);
+        delay(1000);
+      }
+      else{
+        digitalWrite(pumpA, LOW);
+        digitalWrite(pumpB, LOW);
+      }
+
   }
   if(millis() - printTime > printInterval)   //Every 800 milliseconds, print a numerical, convert the state of the LED indicator
   {
@@ -157,18 +177,14 @@ void loop() {
   // assign temperature reading so it can be read to thingsboard.
   temp_reading = T;
 
-  Serial.print("Temperature: ");
-  Serial.print(T);
-  Serial.println(" C");
-
   // Check if the real temp "T" is outside the range SetTemp ± 0.5
   if (T > temp_set + 0.5) {
-    Serial.println("Temperature too high");
     analogWrite(3,56);
+    Serial.println("Temperature too high");
   }
   else if (T < temp_set - 0.5) {
+    analogWrite(3,130);
     Serial.println("Temperature too low");
-    analogWrite(3,127);
   }
   Serial.print("pH set: ");
   Serial.println(pH_set);
